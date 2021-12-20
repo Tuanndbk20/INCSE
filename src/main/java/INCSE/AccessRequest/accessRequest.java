@@ -20,7 +20,7 @@ public class accessRequest {
 	// byte[] resources = null;
 	public static final String Ks = "taokhoaks123456789";
 	public static final String AEID = "123456789";
-	public static final String URL = "URLResources";
+	public static final String URL = "URLResource";
 	public static final int nonceSize = 12;
 
 	private static byte[] hexStringToByteArray(String s) {
@@ -100,16 +100,19 @@ public class accessRequest {
 
 	public static String authenticationTicket(String Qu, String ticket, String n) {
 		// Creat Kt=(Qu||Ks)
+		System.out.println("\n >>>>>>> Process 7.2 to 7.5 Kt, D_Kt(Ticket), Ts, retrieve AE_ID .....");
+		System.out.println("\n >>>>>>> Process 7.2 created Kt = H(Qu||Ks) .....");
 		byte[] IDprivRandConcat = concatByteArrays(hexStringToByteArray(Qu), hexStringToByteArray(Ks));
 		byte[] Kt = sha256(IDprivRandConcat);
 		System.out.println("Kt :" + toHex(Kt));
 
 		// Decrypt Ticket = Dkt(Ticket)--> TokenID, Rn,Texp
+		System.out.println("\n >>>>>>> Process 7.3 Decrypt Ticket = Dkt(Ticket)--> TokenID, Rn,Texp .....");
 		byte[] resources = null;
 		CCMBlockCipher ccm = new CCMBlockCipher(new AESEngine());
 		ccm.init(false, new ParametersWithIV(new KeyParameter(Kt), hexStringToByteArray(n)));
-		byte[] tmp = new byte[ticket.length()];
-		int len = ccm.processBytes(hexStringToByteArray(ticket), 0, ticket.length(), tmp, 0);
+		byte[] tmp = new byte[hexStringToByteArray(ticket).length];
+		int len = ccm.processBytes(hexStringToByteArray(ticket), 0, hexStringToByteArray(ticket).length, tmp, 0);
 		try {
 			len += ccm.doFinal(tmp, len);
 			resources = new byte[len];
@@ -126,7 +129,7 @@ public class accessRequest {
 		String[] data = appData.split("\\|\\|");
 
 		String tokenID = data[0];
-		String Rn = data[1];
+		String Rn = data[1]; // fix AE nen ko dung toi Rn
 		String Texp = data[2];
 
 		System.out.println("tokenID: " + tokenID);
@@ -134,27 +137,30 @@ public class accessRequest {
 		System.out.println("Expired Time Texp:  " + Texp);
 
 		/* Generate a timestamp Ts */
+		System.out.println("\n >>>>>>> Process 7.4 created Ts(break 7.5 vi ko dung Rn ma fix AE) .....");
 		Date date = new Date();
 		long regTimestamp = date.getTime();
 		byte[] regTimestampBytes = longToByteArray(regTimestamp);
-
-		return AEID + "|" + tokenID + "|" + regTimestampBytes;
+		
+		return AEID + "|" + tokenID + "|" + toHex(regTimestampBytes);
 	}
 
 	public static String EncryptURL(String Sk) {
 
 		// Generate a nonce (12 bytes) to be used for AES_256_CCM_8
+		System.out.println("\n >>>>>>> Process 7.7 Encrypt EU=E_Sk(URL) .....");
 		SecureRandom random = new SecureRandom();
 		random = new SecureRandom();
 		byte[] nonce3 = new byte[nonceSize];
 		random.nextBytes(nonce3); // Fill the nonce with random bytes
-		System.out.println("nonce3 = " + toHex(nonce3));
 
 		// Encrypt the URL
+		System.out.println(">>>>>>>>>>>>>>>>>>>>>>>");
+		System.out.println("sessionKey: " + Sk);
 		CCMBlockCipher ccm = new CCMBlockCipher(new AESEngine());
 		ccm.init(true, new ParametersWithIV(new KeyParameter(hexStringToByteArray(Sk)), nonce3));
-		byte[] EU = new byte[URL.length() + 8];
-		int len = ccm.processBytes(hexStringToByteArray(URL), 0, URL.length(), hexStringToByteArray(URL), 0);
+		byte[] EU = new byte[hexStringToByteArray(toHex(URL)).length + 8];
+		int len = ccm.processBytes(hexStringToByteArray(toHex(URL)), 0, hexStringToByteArray(toHex(URL)).length, hexStringToByteArray(toHex(URL)), 0);
 		try {
 			len += ccm.doFinal(EU, len);
 		} catch (IllegalStateException e) {
@@ -164,13 +170,6 @@ public class accessRequest {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("Eu " + toHex(EU));
-		
-		/* Generate a timestamp Ts */
-		Date date = new Date();
-		long regTimestamp = date.getTime();
-		byte[] regTimestampBytes = longToByteArray(regTimestamp);
-		
-		return toHex(EU)+"|"+ toHex(regTimestampBytes) + "|" + nonce3;
+		return toHex(EU)+ "|" + toHex(nonce3);
 	}
 }

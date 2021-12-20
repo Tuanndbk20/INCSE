@@ -9,6 +9,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -27,9 +28,12 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import INCSE.AccessRequest.accessRequest;
+//import client.app.crypto.CryptographicOperations;
 
 public class httpServer {
 	final static int port = 9998;
+	public static String EU;
+	public static String nonce3;
 
 	public static void main(String[] args) throws Exception {
 
@@ -47,41 +51,47 @@ public class httpServer {
 		public void handle(HttpExchange httpExchange) throws IOException {
 			String requestParamValue = null;
 
-			System.out.println(httpExchange.getRequestMethod());
+			System.out.println("Method: " + httpExchange.getRequestMethod());
 
 			if ("GET".equals(httpExchange.getRequestMethod())) {
 
 				// requestParamValue = handleGetRequest(httpExchange);
 
-			} else if ("POST".equals(httpExchange)) {
-
-				// requestParamValue = handlePostRequest(httpExchange);
+			} else if ("POST".equals(httpExchange.getRequestMethod())) {
 				handlePostRequest(httpExchange);
 			}
-			handleResponse(httpExchange, requestParamValue);
+			//handleResponse(httpExchange, requestParamValue);
 		}
 
 		private void handleResponse(HttpExchange httpExchange, String requestParamValue) throws IOException {
 			// OutputStream outputStream = httpExchange.getResponseBody();
-			StringBuilder htmlBuilder = new StringBuilder();
+			// StringBuilder htmlBuilder = new StringBuilder();
 			// requestParamValue=requestParamValue.replace("\n", "<br>");
-
-			htmlBuilder.append("<html>").append("<body>").append("<h1>").append(requestParamValue).append("</h1>")
-					.append("</body>").append("</html>");
-
 			// String htmlResponse = StringEscapeUtils.escapeHtml4(htmlBuilder.toString());
 			// // for what !?
 
-			String htmlResponse = htmlBuilder.toString();
+			/* Create the json body for the request */
+			JsonObject jsonBody = new JsonObject();
+			// jsonBody.addProperty("clientID", Constants.clientID);
+			jsonBody.addProperty("EU", EU);
+			//jsonBody.addProperty("Ts", Ts);
+			jsonBody.addProperty("nonce3", nonce3);
+			Gson gson = new GsonBuilder().create();
+			String body = gson.toJson(jsonBody);
+			
+			System.out.println("Done INCSE!");
+			System.out.println("body response: "+ body);
+			// String htmlResponse = htmlBuilder.toString();
 
 //			htmlResponse = requestParamValue;
 //			System.out.println(htmlResponse);
 
-			httpExchange.sendResponseHeaders(200, htmlResponse.length());
+			// httpExchange.sendResponseHeaders(200, htmlResponse.length());
+			httpExchange.sendResponseHeaders(200, body.length());
 			OutputStream os = httpExchange.getResponseBody();
-			os.write(htmlResponse.getBytes());
+			// os.write(htmlResponse.getBytes());
+			os.write(body.getBytes());
 			os.close();
-
 		}
 
 		private void handlePostRequest(HttpExchange httpExchange) throws IOException {
@@ -109,47 +119,98 @@ public class httpServer {
 
 			// 2 to 5
 			String[] dataTicket = accessRequest.authenticationTicket(Qu, ticket, nonce1).split("\\|");
-
+			
+			
 			String AEID = dataTicket[0];
 			String tokenID = dataTicket[1];
 			String regTimestampBytes = dataTicket[2];
+			
+			System.out.println(">>>>>>>>>>>>>>>>>>>>>>>");
+			System.out.println("timestamp: "+ regTimestampBytes);
 
 			// post DAS
-			processTokenID(AEID,tokenID,regTimestampBytes);
-			
-			// 7
+			String Sk = processTokenID(AEID, tokenID, regTimestampBytes);
 
-			String htmlResponse = "OK";
-			httpExchange.sendResponseHeaders(200, htmlResponse.length());
+			// 7
+			String[] dataEU = accessRequest.EncryptURL(Sk).split("\\|");
+			EU = dataEU[0];
+			nonce3 = dataEU[1];
+
+			System.out.println("EU: " + EU);
+			System.out.println("Ts: " + regTimestampBytes);
+			System.out.println("nonce3: " + nonce3);
+			
+			/* Create the json body for the request */
+			JsonObject jsonBody = new JsonObject();
+			// jsonBody.addProperty("clientID", Constants.clientID);
+			jsonBody.addProperty("EU", EU);
+			jsonBody.addProperty("Ts", regTimestampBytes);
+			jsonBody.addProperty("nonce3", nonce3);
+			Gson gson = new GsonBuilder().create();
+			String body = gson.toJson(jsonBody);
+			
+			System.out.println("Done INCSE!");
+			//System.out.println("body response: "+ body);
+
+			//String htmlResponse = "OK";
+			//httpExchange.sendResponseHeaders(200, htmlResponse.length());
+			httpExchange.sendResponseHeaders(200, body.length());
 			OutputStream os = httpExchange.getResponseBody();
-			os.write(htmlResponse.getBytes());
+			//os.write(htmlResponse.getBytes());
+			os.write(body.getBytes());
 			os.close();
+			
 
 		}
-		
-		//Post DAS
+
+		// Post DAS
 		final static CloseableHttpClient httpclient = HttpClients.createSystem();
-		public static void processTokenID(String AEID, String tokenID, String regTimestampBytes) {	
-					try {
-						HttpPost httpPost = new HttpPost("http://localhost:8080/AuthorizationServer/ResourceClientRegistration");
-						
-						JsonObject jsonBody = new JsonObject();
-						jsonBody.addProperty("AEID", AEID);
-						jsonBody.addProperty("tokenID", tokenID);
-						jsonBody.addProperty("regTimestampBytes", regTimestampBytes);
-						Gson gson = new GsonBuilder().create();
-						String body = gson.toJson(jsonBody);
-						StringEntity content = new StringEntity(body);
-						httpPost.setEntity(content);
-						CloseableHttpResponse resp = httpclient.execute(httpPost);
-						System.out.println(resp.toString());
-						HttpEntity entityP = resp.getEntity();
-						System.out.println(EntityUtils.toString(entityP, "UTF-8"));
-						EntityUtils.consume(entityP);
-						resp.close();
-					} catch (Exception e) {
-						e.printStackTrace();
+
+		public static String processTokenID(String AEID, String tokenID, String regTimestampBytes) {
+			String Sk = "";
+			try {
+				HttpPost httpPost = new HttpPost(
+						"http://localhost:8080/AuthorizationServer/ClientAuthorizationManagement");
+
+				JsonObject jsonBody = new JsonObject();
+				jsonBody.addProperty("aeID", AEID);
+				jsonBody.addProperty("tokenID", tokenID);
+				jsonBody.addProperty("timestamp", regTimestampBytes);
+				Gson gson = new GsonBuilder().create();
+				String body = gson.toJson(jsonBody);
+				StringEntity content = new StringEntity(body);
+				// POST
+				httpPost.setEntity(content);
+
+				// phan hoi http tu DAS
+				CloseableHttpResponse resp = httpclient.execute(httpPost);
+				// System.out.println(resp.toString());
+				HttpEntity entityP = resp.getEntity();
+
+				// Parse the response if it is not empty
+				if (entityP != null) {
+					// Retrieve the payload
+					String respContent = EntityUtils.toString(entityP);
+					if (resp.getStatusLine().getStatusCode() != 400) {
+						// Retrieve the ticket from the payload
+						JsonParser parser = new JsonParser();
+						JsonObject jsonRespBody = parser.parse(respContent).getAsJsonObject();
+
+						Sk = jsonRespBody.get("sessionKey").getAsString();
+
+					} else {
+						System.out.println("Status code != 400");
+						// httpclient.close();
 					}
+					// System.out.println(EntityUtils.toString(entityP, "UTF-8"));
+					EntityUtils.consume(entityP);
+					resp.close();
+				}
+				httpclient.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return Sk;
 		}
 	}
 }
