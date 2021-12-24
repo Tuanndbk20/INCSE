@@ -124,9 +124,6 @@ public class httpServer {
 			String AEID = dataTicket[0];
 			String tokenID = dataTicket[1];
 			String regTimestampBytes = dataTicket[2];
-			
-			System.out.println(">>>>>>>>>>>>>>>>>>>>>>>");
-			System.out.println("timestamp: "+ regTimestampBytes);
 
 			// post DAS
 			String Sk = processTokenID(AEID, tokenID, regTimestampBytes);
@@ -159,8 +156,7 @@ public class httpServer {
 			//os.write(htmlResponse.getBytes());
 			os.write(body.getBytes());
 			os.close();
-			
-
+		
 		}
 
 		// Post DAS

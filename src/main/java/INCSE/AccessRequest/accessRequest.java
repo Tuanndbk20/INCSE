@@ -13,15 +13,27 @@ import org.bouncycastle.crypto.engines.AESEngine;
 import org.bouncycastle.crypto.modes.CCMBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.json.JSONObject;
+
+import INCSE.serverHttp.RestHttpClient;
 
 import org.bouncycastle.crypto.digests.SHA256Digest;
 
 public class accessRequest {
 	// byte[] resources = null;
 	public static final String Ks = "taokhoaks123456789";
-	public static final String AEID = "123456789";
-	public static final String URL = "URLResource";
 	public static final int nonceSize = 12;
+	
+	private static String originator="admin:admin";
+	private static String cseProtocol="http";
+	private static String cseIp = "127.0.0.1";
+	private static int csePort = 8081;
+	private static String cseId = "in-cse";
+	private static String cseName = "in-name";
+	private static String aeName = "temperature";
+	private static String cntData = "DATA";
+	
+	private static String csePoa = cseProtocol+"://"+cseIp+":"+csePort;
 
 	private static byte[] hexStringToByteArray(String s) {
 		int len = s.length();
@@ -129,7 +141,7 @@ public class accessRequest {
 		String[] data = appData.split("\\|\\|");
 
 		String tokenID = data[0];
-		String Rn = data[1]; // fix AE nen ko dung toi Rn
+		String Rn = data[1]; 
 		String Texp = data[2];
 
 		System.out.println("tokenID: " + tokenID);
@@ -137,10 +149,16 @@ public class accessRequest {
 		System.out.println("Expired Time Texp:  " + Texp);
 
 		/* Generate a timestamp Ts */
-		System.out.println("\n >>>>>>> Process 7.4 created Ts(break 7.5 vi ko dung Rn ma fix AE) .....");
+		System.out.println("\n >>>>>>> Process 7.4 created Ts.....");
 		Date date = new Date();
 		long regTimestamp = date.getTime();
 		byte[] regTimestampBytes = longToByteArray(regTimestamp);
+		
+		// retrieve AE
+		System.out.println("\n >>>>>>> Process 7.5 retrieve AE-ID.....");
+		JSONObject getBody = new JSONObject(RestHttpClient.get(originator, csePoa+"/~/"+cseId+"/"+cseName+"/"+Rn).getBody());
+		System.out.println("=================>AE-ID: "+getBody.getJSONObject("m2m:ae").getString("aei"));
+		String AEID = getBody.getJSONObject("m2m:ae").getString("aei");
 		
 		return AEID + "|" + tokenID + "|" + toHex(regTimestampBytes);
 	}
@@ -157,6 +175,7 @@ public class accessRequest {
 		// Encrypt the URL
 		System.out.println(">>>>>>>>>>>>>>>>>>>>>>>");
 		System.out.println("sessionKey: " + Sk);
+		String URL = originator+"|"+csePoa+"/~/"+cseId+"/"+cseName+"/"+aeName+"/"+cntData+"/la"; 
 		CCMBlockCipher ccm = new CCMBlockCipher(new AESEngine());
 		ccm.init(true, new ParametersWithIV(new KeyParameter(hexStringToByteArray(Sk)), nonce3));
 		byte[] EU = new byte[hexStringToByteArray(toHex(URL)).length + 8];
