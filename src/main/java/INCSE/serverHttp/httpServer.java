@@ -124,12 +124,13 @@ public class httpServer {
 			String AEID = dataTicket[0];
 			String tokenID = dataTicket[1];
 			String regTimestampBytes = dataTicket[2];
+			String Permission = dataTicket[3];
 
 			// post DAS
 			String Sk = processTokenID(AEID, tokenID, regTimestampBytes);
 
 			// 7
-			String[] dataEU = accessRequest.EncryptURL(Sk).split("\\|");
+			String[] dataEU = accessRequest.EncryptURL(Sk, Permission).split("\\|");
 			EU = dataEU[0];
 			nonce3 = dataEU[1];
 

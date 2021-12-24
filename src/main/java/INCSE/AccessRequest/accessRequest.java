@@ -110,6 +110,27 @@ public class accessRequest {
 		return hash;
 	}
 
+	public static String getUri() {
+		return csePoa+"/~/"+cseId+"/"+cseName+"/"+aeName+"/"+cntData+"/la";
+	}
+
+	public static String getAcp(String permission) {
+		String acp=null;
+		System.out.println("permission getAcp: "+permission);
+		String test1="32";
+		String test2="34";
+		if (permission.equalsIgnoreCase(test1)) {
+			return acp = "guest:guest";
+	      
+		} else if (permission.equalsIgnoreCase(test2)) {
+			return acp = "admin:admin";
+		}
+		else {
+			System.out.println("permission does not exist yet");
+			return acp;
+		}
+	}
+	
 	public static String authenticationTicket(String Qu, String ticket, String n) {
 		// Creat Kt=(Qu||Ks)
 		System.out.println("\n >>>>>>> Process 7.2 to 7.5 Kt, D_Kt(Ticket), Ts, retrieve AE_ID .....");
@@ -143,10 +164,12 @@ public class accessRequest {
 		String tokenID = data[0];
 		String Rn = data[1]; 
 		String Texp = data[2];
+		String Permission = data[3];
 
 		System.out.println("tokenID: " + tokenID);
 		System.out.println("Resounce name Rn:  " + Rn);
 		System.out.println("Expired Time Texp:  " + Texp);
+		System.out.println("Permission:  " + Permission);
 
 		/* Generate a timestamp Ts */
 		System.out.println("\n >>>>>>> Process 7.4 created Ts.....");
@@ -160,10 +183,10 @@ public class accessRequest {
 		System.out.println("=================>AE-ID: "+getBody.getJSONObject("m2m:ae").getString("aei"));
 		String AEID = getBody.getJSONObject("m2m:ae").getString("aei");
 		
-		return AEID + "|" + tokenID + "|" + toHex(regTimestampBytes);
+		return AEID + "|" + tokenID + "|" + toHex(regTimestampBytes) + "|" + Permission;
 	}
 
-	public static String EncryptURL(String Sk) {
+	public static String EncryptURL(String Sk, String Permission) {
 
 		// Generate a nonce (12 bytes) to be used for AES_256_CCM_8
 		System.out.println("\n >>>>>>> Process 7.7 Encrypt EU=E_Sk(URL) .....");
@@ -175,7 +198,7 @@ public class accessRequest {
 		// Encrypt the URL
 		System.out.println(">>>>>>>>>>>>>>>>>>>>>>>");
 		System.out.println("sessionKey: " + Sk);
-		String URL = originator+"|"+csePoa+"/~/"+cseId+"/"+cseName+"/"+aeName+"/"+cntData+"/la"; 
+		String URL = getAcp(Permission)+"|"+getUri(); 
 		CCMBlockCipher ccm = new CCMBlockCipher(new AESEngine());
 		ccm.init(true, new ParametersWithIV(new KeyParameter(hexStringToByteArray(Sk)), nonce3));
 		byte[] EU = new byte[hexStringToByteArray(toHex(URL)).length + 8];
